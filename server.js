@@ -13,6 +13,8 @@ app.use(express.json());
 app.post("/generate", async (req, res) => {
   const { prompt, model = "img4", size = "1024x1024", num_images = 1 } = req.body;
 
+  console.log(`🎨 Generating ${num_images} image(s) with ${model}, size: ${size}`);
+
   try {
     const response = await axios.post(
       "https://api.infip.pro/v1/images/generations",
@@ -25,9 +27,18 @@ app.post("/generate", async (req, res) => {
       }
     );
 
-    res.status(200).json(response.data);
+    console.log(`✅ API Response:`, response.data);
+    console.log(`✅ Successfully generated ${response.data.images?.length || 0} image(s)`);
+    
+    // Return response with both formats for compatibility
+    res.status(200).json({
+      ...response.data,
+      // Add backward compatibility
+      data: response.data.images ? response.data.images.map(url => ({ url })) : []
+    });
+
   } catch (error) {
-    console.error("Error generating image:", error.response?.data || error.message);
+    console.error("❌ Error generating image:", error.response?.data || error.message);
     res.status(500).json({ error: "Image generation failed." });
   }
 });
