@@ -13,33 +13,89 @@ app.use(express.json());
 app.post("/generate", async (req, res) => {
   const { prompt, model = "img4", size = "1024x1024", num_images = 1 } = req.body;
 
-  console.log(`🎨 Generating ${num_images} image(s) with ${model}, size: ${size}`);
+  console.log(`🎨 API Request - Prompt: "${prompt}"`);
+  console.log(`🎨 API Request - Model: ${model}`);
+  console.log(`🎨 API Request - Size: ${size}`);
+  console.log(`🎨 API Request - Num Images: ${num_images}`);
 
   try {
+    const apiPayload = {
+      prompt: prompt.trim(),
+      model: model,
+      size: size,
+      num_images: parseInt(num_images)
+    };
+
+    console.log("📤 Sending to API:", apiPayload);
+
     const response = await axios.post(
       "https://api.infip.pro/v1/images/generations",
-      { prompt, model, size, num_images },
+      apiPayload,
       {
         headers: {
-          Authorization: `Bearer ${process.env.API_KEY}`,
+          Authorization: `Bearer infip-c5d4def5`,
           "Content-Type": "application/json",
         },
+        timeout: 180000 // 3 minutes
       }
     );
 
-    console.log(`✅ API Response:`, response.data);
-    console.log(`✅ Successfully generated ${response.data.images?.length || 0} image(s)`);
-    
-    // Return response with both formats for compatibility
-    res.status(200).json({
-      ...response.data,
-      // Add backward compatibility
-      data: response.data.images ? response.data.images.map(url => ({ url })) : []
-    });
+    console.log("📥 Raw API Response:", JSON.stringify(response.data, null, 2));
+
+    // Check response format and return accordingly
+    if (response.data) {
+      res.status(200).json(response.data);
+    } else {
+      console.error("❌ Empty API response");
+      res.status(500).json({ 
+        error: "Empty response from API",
+        debug: response.data 
+      });
+    }
 
   } catch (error) {
-    console.error("❌ Error generating image:", error.response?.data || error.message);
-    res.status(500).json({ error: "Image generation failed." });
+    console.error("❌ API Error Details:");
+    console.error("Status:", error.response?.status);
+    console.error("Headers:", error.response?.headers);
+    console.error("Data:", error.response?.data);
+    console.error("Message:", error.message);
+    
+    res.status(500).json({ 
+      error: "API call failed",
+      status: error.response?.status,
+      details: error.response?.data || error.message
+    });
+  }
+});
+
+// Test endpoint to check exact API response
+app.post("/test-generate", async (req, res) => {
+  try {
+    const response = await axios.post(
+      "https://api.infip.pro/v1/images/generations",
+      {
+        prompt: "A beautiful sunset",
+        model: "img4",
+        size: "1024x1024",
+        num_images: 2
+      },
+      {
+        headers: {
+          Authorization: `Bearer infip-c5d4def5`,
+          "Content-Type": "application/json",
+        }
+      }
+    );
+
+    res.json({
+      status: "Test successful",
+      response: response.data
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: "Test failed",
+      error: error.response?.data || error.message
+    });
   }
 });
 
